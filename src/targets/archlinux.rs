@@ -1,12 +1,15 @@
-use crate::config::{fetch_json, AppError, Config, FetchMirrors, LogFormatter};
+use crate::config::{AppError, Config, FetchMirrors, LogFormatter};
 use crate::countries::Country;
 use crate::mirror::Mirror;
 use crate::target_configs::archlinux::{ArchMirrorsSortingStrategy, ArchTarget};
 use rand::prelude::SliceRandom;
 use rand::rng;
+use reqwest;
 use serde::Deserialize;
 use std::fmt::Display;
-use std::sync::{mpsc, Arc};
+use std::sync::{Arc, mpsc};
+use std::time::Duration;
+use tokio::runtime::Runtime;
 use url::Url;
 
 #[derive(Deserialize, Debug, Clone)]
@@ -41,13 +44,9 @@ impl FetchMirrors for ArchTarget {
         config: Arc<Config>,
         tx_progress: mpsc::Sender<String>,
     ) -> Result<Vec<Mirror>, AppError> {
-        let url = if self.fetch_first_tier_only {
-            "https://archlinux.org/mirrors/status/tier/1/json/"
-        } else {
-            "https://archlinux.org/mirrors/status/json/"
-        };
-
-        let mirrors_data: ArchMirrorsData = fetch_json(url, self.fetch_mirrors_timeout)?;
+        let mirrors_data = Runtime::new().unwrap().block_on(async {
+            fetch_mirrors_data(self.fetch_first_tier_only, self.fetch_mirrors_timeout).await
+        })?;
 
         tx_progress
             .send(format!("FETCHED MIRRORS: {}", mirrors_data.urls.len()))
@@ -107,5 +106,49 @@ impl FetchMirrors for ArchTarget {
             .collect();
 
         Ok(result)
+    }
+}
+
+async fn fetch_mirrors_from_url(
+    client: &reqwest::Client,
+    url: &str,
+    timeout: Duration,
+) -> Result<ArchMirrorsData, reqwest::Error> {
+    client
+        .get(url)
+        .timeout(timeout)
+        .send()
+        .await?
+        .json::<ArchMirrorsData>()
+        .await
+}
+
+async fn fetch_mirrors_data(
+    fetch_first_tier_only: bool,
+    fetch_mirrors_timeout: u64,
+) -> Result<ArchMirrorsData, AppError> {
+    let (primary_url, fallback_url) = if fetch_first_tier_only {
+        (
+            "https://cachyos.org/archlinuxmirrorlist/api/tier1",
+            "https://archlinux.org/mirrors/status/tier/1/json/",
+        )
+    } else {
+        (
+            "https://cachyos.org/archlinuxmirrorlist/api/status",
+            "https://archlinux.org/mirrors/status/json/",
+        )
+    };
+
+    let client = reqwest::Client::new();
+    let timeout = Duration::from_millis(fetch_mirrors_timeout);
+
+    // try to use cachyos proxy first, and then fallback to archlinux one
+    let primary_res = fetch_mirrors_from_url(&client, primary_url, timeout).await;
+    if let Err(_err) = primary_res {
+        println!("# Falling back mirrorlist url to archlinux");
+        Ok(fetch_mirrors_from_url(&client, fallback_url, timeout).await?)
+    } else {
+        // result is already checked
+        Ok(primary_res.unwrap())
     }
 }
