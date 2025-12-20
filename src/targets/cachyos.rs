@@ -1,8 +1,11 @@
-use crate::config::{fetch_text, AppError, Config, FetchMirrors, LogFormatter};
+use crate::config::{AppError, Config, FetchMirrors, LogFormatter};
 use crate::mirror::Mirror;
 use crate::target_configs::cachyos::CachyOSTarget;
+use reqwest;
 use std::fmt::Display;
-use std::sync::{mpsc, Arc};
+use std::sync::{Arc, mpsc};
+use std::time::Duration;
+use tokio::runtime::Runtime;
 use url::Url;
 
 impl LogFormatter for CachyOSTarget {
@@ -27,9 +30,9 @@ impl FetchMirrors for CachyOSTarget {
         config: Arc<Config>,
         _tx_progress: mpsc::Sender<String>,
     ) -> Result<Vec<Mirror>, AppError> {
-        let url = "https://raw.githubusercontent.com/CachyOS/CachyOS-PKGBUILDS/master/cachyos-mirrorlist/cachyos-mirrorlist";
-
-        let output = fetch_text(url, self.fetch_mirrors_timeout)?;
+        let output = Runtime::new()
+            .unwrap()
+            .block_on(async { fetch_mirrors_data(self.fetch_mirrors_timeout).await })?;
 
         let urls = output
             .lines()
@@ -53,5 +56,41 @@ impl FetchMirrors for CachyOSTarget {
             .collect();
 
         Ok(result)
+    }
+}
+
+async fn fetch_mirrors_from_url(
+    client: &reqwest::Client,
+    url: &str,
+    timeout: Duration,
+) -> Result<String, reqwest::Error> {
+    client
+        .get(url)
+        .timeout(timeout)
+        .send()
+        .await?
+        .text_with_charset("utf-8")
+        .await
+}
+
+async fn fetch_mirrors_data(fetch_mirrors_timeout: u64) -> Result<String, AppError> {
+    let (primary_url, fallback_url) = {
+        (
+            "https://cachyos.org/archlinuxmirrorlist/api/cachyos-mirrorlist",
+            "https://raw.githubusercontent.com/CachyOS/CachyOS-PKGBUILDS/master/cachyos-mirrorlist/cachyos-mirrorlist",
+        )
+    };
+
+    let client = reqwest::Client::new();
+    let timeout = Duration::from_millis(fetch_mirrors_timeout);
+
+    // try to use cachyos proxy first, and then fallback to github one
+    let primary_res = fetch_mirrors_from_url(&client, primary_url, timeout).await;
+    if let Err(_err) = primary_res {
+        println!("# Falling back mirrorlist url");
+        Ok(fetch_mirrors_from_url(&client, fallback_url, timeout).await?)
+    } else {
+        // result is already checked
+        Ok(primary_res.unwrap())
     }
 }
