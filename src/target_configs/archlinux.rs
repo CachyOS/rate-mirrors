@@ -2,6 +2,7 @@ use clap::Args;
 use std::str::FromStr;
 
 pub const ARCH_MIRROR_SOURCE_DEFAULT: &str = "https://cachyos.org/archlinuxmirrorlist/api/status";
+pub const ARCH_MIRROR_SOURCE_FALLBACK: &str = "https://archlinux.org/mirrors/status/json/";
 
 #[derive(Debug, Clone)]
 pub enum ArchMirrorsSortingStrategy {

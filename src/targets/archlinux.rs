@@ -1,7 +1,10 @@
 use crate::config::{AppError, FetchMirrors, LogFormatter, fetch_json_or_file};
 use crate::countries::Country;
 use crate::mirror::Mirror;
-use crate::target_configs::archlinux::{ArchMirrorsSortingStrategy, ArchTarget};
+use crate::target_configs::archlinux::{
+    ArchMirrorsSortingStrategy, ArchTarget, ARCH_MIRROR_SOURCE_DEFAULT,
+    ARCH_MIRROR_SOURCE_FALLBACK,
+};
 use rand::prelude::SliceRandom;
 use rand::rng;
 use serde::Deserialize;
@@ -11,6 +14,8 @@ use url::Url;
 
 pub(crate) const ARCH_TIER_1_MIRROR_SOURCE: &str =
     "https://cachyos.org/archlinuxmirrorlist/api/tier1";
+pub(crate) const ARCH_TIER_1_MIRROR_SOURCE_FALLBACK: &str =
+    "https://archlinux.org/mirrors/status/tier/1/json/";
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct ArchMirror {
@@ -47,10 +52,36 @@ pub(crate) fn selected_mirror_source(target: &ArchTarget) -> &str {
     }
 }
 
+pub(crate) fn arch_mirror_source_fallback(primary: &str) -> Option<&'static str> {
+    match primary {
+        ARCH_MIRROR_SOURCE_DEFAULT => Some(ARCH_MIRROR_SOURCE_FALLBACK),
+        ARCH_TIER_1_MIRROR_SOURCE => Some(ARCH_TIER_1_MIRROR_SOURCE_FALLBACK),
+        _ => None,
+    }
+}
+
+fn fetch_arch_mirrors_data(
+    target: &ArchTarget,
+    tx_progress: &mpsc::Sender<String>,
+) -> Result<ArchMirrorsData, AppError> {
+    let primary = selected_mirror_source(target);
+    match fetch_json_or_file(primary, target.fetch_mirrors_timeout) {
+        Ok(data) => Ok(data),
+        Err(err) => match arch_mirror_source_fallback(primary) {
+            Some(fallback) => {
+                tx_progress
+                    .send("Falling back mirrorlist url to archlinux".to_string())
+                    .unwrap();
+                fetch_json_or_file(fallback, target.fetch_mirrors_timeout)
+            }
+            None => Err(err),
+        },
+    }
+}
+
 impl FetchMirrors for ArchTarget {
     fn fetch_mirrors(&self, tx_progress: mpsc::Sender<String>) -> Result<Vec<Mirror>, AppError> {
-        let mirrors_data: ArchMirrorsData =
-            fetch_json_or_file(selected_mirror_source(self), self.fetch_mirrors_timeout)?;
+        let mirrors_data = fetch_arch_mirrors_data(self, &tx_progress)?;
 
         tx_progress
             .send(format!("FETCHED MIRRORS: {}", mirrors_data.urls.len()))

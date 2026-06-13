@@ -451,7 +451,13 @@ pub fn fetch_json_or_file<T: DeserializeOwned>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::targets::archlinux::{ARCH_TIER_1_MIRROR_SOURCE, selected_mirror_source};
+    use crate::targets::archlinux::{
+        ARCH_TIER_1_MIRROR_SOURCE, ARCH_TIER_1_MIRROR_SOURCE_FALLBACK,
+        arch_mirror_source_fallback, selected_mirror_source,
+    };
+    use crate::target_configs::archlinux::{
+        ARCH_MIRROR_SOURCE_DEFAULT, ARCH_MIRROR_SOURCE_FALLBACK,
+    };
     use clap::error::ErrorKind;
     use std::sync::Mutex;
 
@@ -546,5 +552,30 @@ mod tests {
         .unwrap_err();
 
         assert_eq!(err.kind(), ErrorKind::ArgumentConflict);
+    }
+
+    #[test]
+    fn arch_default_mirror_source_falls_back_to_archlinux() {
+        assert_eq!(
+            arch_mirror_source_fallback(ARCH_MIRROR_SOURCE_DEFAULT),
+            Some(ARCH_MIRROR_SOURCE_FALLBACK)
+        );
+    }
+
+    #[test]
+    fn arch_tier_1_mirror_source_falls_back_to_archlinux() {
+        assert_eq!(
+            arch_mirror_source_fallback(ARCH_TIER_1_MIRROR_SOURCE),
+            Some(ARCH_TIER_1_MIRROR_SOURCE_FALLBACK)
+        );
+    }
+
+    #[test]
+    fn arch_custom_mirror_source_has_no_fallback() {
+        assert_eq!(arch_mirror_source_fallback("local-status.json"), None);
+        assert_eq!(
+            arch_mirror_source_fallback("https://example.com/mirrors.json"),
+            None
+        );
     }
 }

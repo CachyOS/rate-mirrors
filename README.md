@@ -115,7 +115,7 @@ The tool uses:
 
 ### How it works (arch example):
 
-1. Fetch mirrors from [Arch Linux Mirror Status](https://archlinux.org/mirrors/status/json/)
+1. Fetch mirrors from the [CachyOS Arch mirrorlist proxy](https://cachyos.org/archlinuxmirrorlist/api/status), falling back to [Arch Linux Mirror Status](https://archlinux.org/mirrors/status/json/) if the proxy is unreachable
 2. Filter out incomplete or outdated mirrors
 3. Sort by mirror score
 4. Starting from entry country, find neighbor countries using:
