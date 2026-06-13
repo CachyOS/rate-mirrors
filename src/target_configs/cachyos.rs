@@ -14,7 +14,7 @@ pub struct CachyOSTarget {
     #[arg(
         env = "RATE_MIRRORS_MIRROR_LIST_FILE",
         long,
-        default_value = "https://raw.githubusercontent.com/CachyOS/CachyOS-PKGBUILDS/master/cachyos-mirrorlist/cachyos-mirrorlist",
+        default_value = "https://cachyos.org/archlinuxmirrorlist/api/cachyos-mirrorlist",
         verbatim_doc_comment
     )]
     pub mirror_list_file: String,
