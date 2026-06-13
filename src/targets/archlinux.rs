@@ -10,7 +10,7 @@ use std::sync::mpsc;
 use url::Url;
 
 pub(crate) const ARCH_TIER_1_MIRROR_SOURCE: &str =
-    "https://archlinux.org/mirrors/status/tier/1/json/";
+    "https://cachyos.org/archlinuxmirrorlist/api/tier1";
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct ArchMirror {
