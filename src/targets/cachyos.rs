@@ -118,18 +118,55 @@ impl CachyOSTarget {
 
 impl FetchMirrors for CachyOSTarget {
     fn fetch_mirrors(&self, tx_progress: mpsc::Sender<String>) -> Result<Vec<Mirror>, AppError> {
-        let output = fetch_text_or_file(&self.mirror_list_file, self.fetch_mirrors_timeout)?;
+        let timeout = self.fetch_mirrors_timeout;
 
-        let result = match self.parse_api_json(&output) {
-            Some(mirrors) => mirrors,
-            None => self.parse_mirrorlist(&output),
-        };
+        // Prefer the mirrors API.
+        let api_body = fetch_with_fallback(
+            &self.mirrors_api_source,
+            &self.mirrors_api_source_fallback,
+            timeout,
+            "mirrors API",
+        );
+        if let Ok(raw) = api_body {
+            if let Some(mirrors) = self.parse_api_json(&raw) {
+                if !mirrors.is_empty() {
+                    tx_progress
+                        .send(format!("FETCHED MIRRORS: {}", mirrors.len()))
+                        .ok();
+                    return Ok(mirrors);
+                }
+            }
+        }
+
+        // Fallback to the plain pacman mirrorlist.
+        let list_body = fetch_with_fallback(
+            &self.mirrorlist_source,
+            &self.mirrorlist_source_fallback,
+            timeout,
+            "mirrorlist",
+        )?;
+        let mirrors = self.parse_mirrorlist(&list_body);
 
         tx_progress
-            .send(format!("FETCHED MIRRORS: {}", result.len()))
-            .unwrap();
+            .send(format!("FETCHED MIRRORS: {}", mirrors.len()))
+            .ok();
+        Ok(mirrors)
+    }
+}
 
-        Ok(result)
+/// Fetch `primary`, and on error use fallback URL
+fn fetch_with_fallback(
+    primary: &str,
+    fallback: &str,
+    timeout_ms: u64,
+    label: &str,
+) -> Result<String, AppError> {
+    match fetch_text_or_file(primary, timeout_ms) {
+        Ok(body) => Ok(body),
+        Err(_err) => {
+            println!("# Falling back {label} url");
+            fetch_text_or_file(fallback, timeout_ms)
+        }
     }
 }
 
@@ -140,7 +177,10 @@ mod tests {
     fn make_target(max_delay: i64) -> CachyOSTarget {
         CachyOSTarget {
             fetch_mirrors_timeout: 15000,
-            mirror_list_file: String::new(),
+            mirrors_api_source: String::new(),
+            mirrors_api_source_fallback: String::new(),
+            mirrorlist_source: String::new(),
+            mirrorlist_source_fallback: String::new(),
             path_to_test: "x86_64/cachyos/cachyos.files".to_string(),
             arch: "auto".to_string(),
             comment_prefix: "# ".to_string(),
