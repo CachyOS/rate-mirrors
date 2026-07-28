@@ -451,7 +451,6 @@ pub fn fetch_json_or_file<T: DeserializeOwned>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::targets::archlinux::{ARCH_TIER_1_MIRROR_SOURCE, selected_mirror_source};
     use clap::error::ErrorKind;
     use std::sync::Mutex;
 
@@ -491,17 +490,12 @@ mod tests {
     }
 
     #[test]
-    fn arch_fetch_first_tier_only_succeeds_and_selects_tier_1_source() {
-        let config = parse_arch_with_mirror_source_env(
+    fn arch_fetch_first_tier_only_succeeds() {
+        parse_arch_with_mirror_source_env(
             None,
             &["rate-mirrors", "arch", "--fetch-first-tier-only"],
         )
         .unwrap();
-
-        assert_eq!(
-            selected_mirror_source(arch_target(&config)),
-            ARCH_TIER_1_MIRROR_SOURCE
-        );
     }
 
     #[test]
