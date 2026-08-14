@@ -15,7 +15,7 @@ pub struct CachyOSTarget {
     #[arg(
         env = "RATE_MIRRORS_MIRRORS_API_SOURCE",
         long,
-        default_value = "https://cachyos.org/archlinuxmirrorlist/api/cachyos-mirrors",
+        default_value = "https://mirrorlist-proxy.cachyos.org/cachyos-mirrors",
         verbatim_doc_comment
     )]
     pub mirrors_api_source: String,
@@ -36,7 +36,7 @@ pub struct CachyOSTarget {
     #[arg(
         env = "RATE_MIRRORS_MIRRORLIST_SOURCE",
         long,
-        default_value = "https://cachyos.org/archlinuxmirrorlist/api/cachyos-mirrorlist",
+        default_value = "https://mirrorlist-proxy.cachyos.org/cachyos-mirrorlist",
         verbatim_doc_comment
     )]
     pub mirrorlist_source: String,

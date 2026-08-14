@@ -11,8 +11,8 @@ use url::Url;
 
 pub(crate) const ARCH_TIER_1_MIRROR_SOURCE: &str =
     "https://archlinux.org/mirrors/status/tier/1/json/";
-const ARCH_CACHYOS_PROXY_TIER_1_SOURCE: &str = "https://cachyos.org/archlinuxmirrorlist/api/tier1";
-const ARCH_CACHYOS_PROXY_STATUS_SOURCE: &str = "https://cachyos.org/archlinuxmirrorlist/api/status";
+const ARCH_CACHYOS_PROXY_TIER_1_SOURCE: &str = "https://mirrorlist-proxy.cachyos.org/tier1";
+const ARCH_CACHYOS_PROXY_STATUS_SOURCE: &str = "https://mirrorlist-proxy.cachyos.org/status";
 const ARCH_STATUS_SOURCE: &str = "https://archlinux.org/mirrors/status/json/";
 
 #[derive(Deserialize, Debug, Clone)]
